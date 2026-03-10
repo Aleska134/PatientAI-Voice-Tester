@@ -35,12 +35,6 @@ async function startServer() {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server });
 
-  // Debugging middleware
-  app.use((req, res, next) => {
-    console.log(`[Server] ${req.method} ${req.url}`);
-    next();
-  });
-
   // API: Get calls
   app.get("/api/calls", (req, res) => {
     const calls = db.prepare("SELECT * FROM calls ORDER BY created_at DESC").all();
@@ -89,34 +83,6 @@ async function startServer() {
     }
   });
 
-  // API: Update bug report
-  app.post("/api/calls/:id/bug-report", (req, res) => {
-    const { id } = req.params;
-    const { bugReport } = req.body;
-    db.prepare("UPDATE calls SET bug_report = ? WHERE id = ?").run(bugReport, id);
-    res.json({ success: true });
-  });
-
-  // API: Download transcript
-  app.get("/api/calls/:id/download", (req, res) => {
-    const { id } = req.params;
-    const call = db.prepare("SELECT * FROM calls WHERE id = ?").get(id) as any;
-    if (!call) return res.status(404).send("Call not found");
-    
-    const content = `CALL ID: ${call.id}\nSCENARIO: ${call.scenario_id}\nDATE: ${call.created_at}\n\nTRANSCRIPT:\n${call.transcript}\n\nBUG REPORT:\n${call.bug_report || 'No bugs reported.'}`;
-    res.setHeader('Content-disposition', `attachment; filename=transcript_${id}.txt`);
-    res.setHeader('Content-type', 'text/plain');
-    res.send(content);
-  });
-
-  // Twilio Recording Callback
-  app.post("/api/recording-callback/:callId", (req, res) => {
-    const { callId } = req.params;
-    const { RecordingUrl } = req.body;
-    db.prepare("UPDATE calls SET recording_url = ? WHERE id = ?").run(RecordingUrl + ".mp3", callId);
-    res.sendStatus(200);
-  });
-
   // TwiML Endpoint
   app.post("/twiml/:callId", (req, res) => {
     const { callId } = req.params;
@@ -124,6 +90,7 @@ async function startServer() {
     
     const response = new twilio.twiml.VoiceResponse();
     const connect = response.connect();
+    // Using default mulaw 8000Hz as it's more stable for Twilio
     connect.stream({
       url: `${appUrl}/media-stream/${callId}`,
     });
@@ -151,22 +118,22 @@ async function startServer() {
     const connectGemini = async () => {
       try {
         geminiSession = await ai.live.connect({
-          model: "gemini-2.5-flash-native-audio-preview-09-2025",
+          model: "gemini-2.0-flash-exp",
           config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
               voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } },
             },
             systemInstruction: scenarioConfig?.systemInstruction || "You are a patient calling a doctor.",
+            // Using mulaw to match Twilio's default stream
             inputAudioTranscription: {},
             outputAudioTranscription: {},
           },
           callbacks: {
             onmessage: (message: LiveServerMessage) => {
-              // Handle audio output to Twilio
               if (message.serverContent?.modelTurn?.parts[0]?.inlineData?.data) {
                 const audioBase64 = message.serverContent.modelTurn.parts[0].inlineData.data;
-                console.log(`[Gemini] Sending audio chunk (${audioBase64.length} bytes)`);
+                console.log(`[Gemini] Received audio chunk: ${audioBase64.length} bytes`);
                 if (streamSid) {
                   ws.send(JSON.stringify({
                     event: "media",
@@ -176,7 +143,6 @@ async function startServer() {
                 }
               }
               
-              // Log Patient (Gemini) transcription
               if (message.serverContent?.modelTurn?.parts[0]?.text) {
                 const text = message.serverContent.modelTurn.parts[0].text;
                 console.log(`[Gemini Text]: ${text}`);
@@ -186,7 +152,6 @@ async function startServer() {
                 );
               }
 
-              // Log Agent (The test line) transcription
               const userTurn = (message.serverContent as any)?.userTurn;
               if (userTurn?.parts[0]?.text) {
                 const text = userTurn.parts[0].text;
@@ -199,9 +164,11 @@ async function startServer() {
             },
             onopen: () => {
               console.log("[Gemini] Connection open");
-              // Improved greeting logic: send a small piece of audio silence or wait for user
               if (geminiSession) {
-                console.log("[Gemini] Ready to receive audio");
+                // Send initial greeting as text to trigger audio response
+                geminiSession.sendRealtimeInput({
+                  text: "Hello? Is this the doctor's office? I'd like to make an appointment."
+                });
               }
             },
             onerror: (err) => console.error("[Gemini] Error:", err),
@@ -223,9 +190,9 @@ async function startServer() {
           break;
         case "media":
           if (geminiSession) {
-            // Forward Twilio audio (8000Hz PCM) to Gemini
+            // Forward Twilio audio (8000Hz mulaw) to Gemini
             geminiSession.sendRealtimeInput({
-              media: { data: data.media.payload, mimeType: "audio/pcm;rate=8000" }
+              media: { data: data.media.payload, mimeType: "audio/mulaw;rate=8000" }
             });
           }
           break;
