@@ -57,7 +57,7 @@ async function startServer() {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const from = process.env.TWILIO_PHONE_NUMBER;
-    const to = process.env.TARGET_PHONE_NUMBER || "+17864195286"; // Default to challenge number
+    const to = process.env.TARGET_PHONE_NUMBER || "+18054398008";
 
     if (!accountSid || !authToken || !from) {
       return res.status(500).json({ error: "Twilio credentials missing" });
@@ -143,61 +143,73 @@ async function startServer() {
     let streamSid: string | null = null;
     let geminiSession: any = null;
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.OPENAI_API_KEY });
     const scenario = db.prepare("SELECT scenario_id FROM calls WHERE id = ?").get(callId) as any;
     const scenarioConfig = SCENARIOS.find(s => s.id === scenario?.scenario_id);
 
     // Connect to Gemini Live
     const connectGemini = async () => {
-      geminiSession = await ai.live.connect({
-        model: "gemini-2.5-flash-native-audio-preview-09-2025",
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } },
+      try {
+        geminiSession = await ai.live.connect({
+          model: "gemini-2.5-flash-native-audio-preview-09-2025",
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } },
+            },
+            systemInstruction: scenarioConfig?.systemInstruction || "You are a patient calling a doctor.",
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
           },
-          systemInstruction: scenarioConfig?.systemInstruction || "You are a patient calling a doctor.",
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-        },
-        callbacks: {
-          onmessage: (message: LiveServerMessage) => {
-            // Handle audio output to Twilio
-            if (message.serverContent?.modelTurn?.parts[0]?.inlineData?.data) {
-              const audioBase64 = message.serverContent.modelTurn.parts[0].inlineData.data;
-              if (streamSid) {
-                ws.send(JSON.stringify({
-                  event: "media",
-                  streamSid,
-                  media: { payload: audioBase64 }
-                }));
+          callbacks: {
+            onmessage: (message: LiveServerMessage) => {
+              // Handle audio output to Twilio
+              if (message.serverContent?.modelTurn?.parts[0]?.inlineData?.data) {
+                const audioBase64 = message.serverContent.modelTurn.parts[0].inlineData.data;
+                console.log(`[Gemini] Sending audio chunk (${audioBase64.length} bytes)`);
+                if (streamSid) {
+                  ws.send(JSON.stringify({
+                    event: "media",
+                    streamSid,
+                    media: { payload: audioBase64 }
+                  }));
+                }
               }
-            }
-            
-            // Log Patient (Gemini) transcription
-            if (message.serverContent?.modelTurn?.parts[0]?.text) {
-              const text = message.serverContent.modelTurn.parts[0].text;
-              db.prepare("UPDATE calls SET transcript = transcript || ? WHERE id = ?").run(
-                `[Patient]: ${text}\n`,
-                callId
-              );
-            }
+              
+              // Log Patient (Gemini) transcription
+              if (message.serverContent?.modelTurn?.parts[0]?.text) {
+                const text = message.serverContent.modelTurn.parts[0].text;
+                console.log(`[Gemini Text]: ${text}`);
+                db.prepare("UPDATE calls SET transcript = transcript || ? WHERE id = ?").run(
+                  `[Patient]: ${text}\n`,
+                  callId
+                );
+              }
 
-            // Log Agent (The test line) transcription
-            // Note: inputAudioTranscription results appear in userTurn
-            const userTurn = (message.serverContent as any)?.userTurn;
-            if (userTurn?.parts[0]?.text) {
-              const text = userTurn.parts[0].text;
-              db.prepare("UPDATE calls SET transcript = transcript || ? WHERE id = ?").run(
-                `[Agent]: ${text}\n`,
-                callId
-              );
-            }
-          },
-          onopen: () => console.log("[Gemini] Connection open"),
-          onerror: (err) => console.error("[Gemini] Error:", err),
-        }
-      });
+              // Log Agent (The test line) transcription
+              const userTurn = (message.serverContent as any)?.userTurn;
+              if (userTurn?.parts[0]?.text) {
+                const text = userTurn.parts[0].text;
+                console.log(`[Agent Text]: ${text}`);
+                db.prepare("UPDATE calls SET transcript = transcript || ? WHERE id = ?").run(
+                  `[Agent]: ${text}\n`,
+                  callId
+                );
+              }
+            },
+            onopen: () => {
+              console.log("[Gemini] Connection open");
+              // Improved greeting logic: send a small piece of audio silence or wait for user
+              if (geminiSession) {
+                console.log("[Gemini] Ready to receive audio");
+              }
+            },
+            onerror: (err) => console.error("[Gemini] Error:", err),
+          }
+        });
+      } catch (err) {
+        console.error("[Gemini] Connection failed:", err);
+      }
     };
 
     connectGemini();
@@ -211,6 +223,7 @@ async function startServer() {
           break;
         case "media":
           if (geminiSession) {
+            // Forward Twilio audio (8000Hz PCM) to Gemini
             geminiSession.sendRealtimeInput({
               media: { data: data.media.payload, mimeType: "audio/pcm;rate=8000" }
             });
