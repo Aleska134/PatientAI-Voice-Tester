@@ -13,7 +13,9 @@ import {
   CheckCircle2, 
   Loader2, 
   MessageSquare,
-  Bug
+  Bug,
+  Sparkles,
+  FileDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -33,13 +35,13 @@ export default function App() {
   const [selectedCall, setSelectedCall] = useState<Call | null>(null);
   const [activeTab, setActiveTab] = useState<'scenarios' | 'history'>('scenarios');
   const [bugReport, setBugReport] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   const fetchCalls = async () => {
     try {
       const res = await fetch("/api/calls");
       const data = await res.json();
       setCalls(data);
-      // Update selected call if it's currently open to show live transcript
       if (selectedCall) {
         const updated = data.find((c: Call) => c.id === selectedCall.id);
         if (updated) setSelectedCall(updated);
@@ -72,6 +74,30 @@ export default function App() {
       alert("Bug report saved!");
     } catch (err) {
       alert("Failed to save bug report");
+    }
+  };
+
+  const generateAiBugReport = async () => {
+    if (!selectedCall) return;
+    if (!selectedCall.transcript) {
+      alert("No transcript available yet.");
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await fetch(`/api/calls/${selectedCall.id}/ai-bug-report`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBugReport(data.bugReport);
+      } else {
+        alert("Failed to generate report: " + data.error);
+      }
+    } catch (err) {
+      alert("Failed to generate AI bug report");
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -115,20 +141,29 @@ export default function App() {
               <p className="text-xs opacity-50 uppercase tracking-widest font-medium">Engineering Challenge Dashboard</p>
             </div>
           </div>
-          <nav className="flex gap-1 bg-black/5 p-1 rounded-lg">
-            <button 
-              onClick={() => setActiveTab('scenarios')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'scenarios' ? 'bg-white shadow-sm' : 'opacity-60 hover:opacity-100'}`}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.open("/api/qa-report", "_blank")}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-all"
             >
-              Scenarios
+              <FileDown className="w-4 h-4" />
+              Export QA Report
             </button>
-            <button 
-              onClick={() => setActiveTab('history')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'history' ? 'bg-white shadow-sm' : 'opacity-60 hover:opacity-100'}`}
-            >
-              Call History
-            </button>
-          </nav>
+            <nav className="flex gap-1 bg-black/5 p-1 rounded-lg">
+              <button 
+                onClick={() => setActiveTab('scenarios')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'scenarios' ? 'bg-white shadow-sm' : 'opacity-60 hover:opacity-100'}`}
+              >
+                Scenarios
+              </button>
+              <button 
+                onClick={() => setActiveTab('history')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'history' ? 'bg-white shadow-sm' : 'opacity-60 hover:opacity-100'}`}
+              >
+                Call History
+              </button>
+            </nav>
+          </div>
         </div>
       </header>
 
@@ -245,13 +280,26 @@ export default function App() {
                       </div>
 
                       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
-                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-4 flex items-center gap-2">
-                          <Bug className="w-3 h-3" /> Bug Report / Observations
-                        </h3>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-[10px] font-bold uppercase tracking-widest text-amber-600 flex items-center gap-2">
+                            <Bug className="w-3 h-3" /> Bug Report / Observations
+                          </h3>
+                          <button
+                            onClick={generateAiBugReport}
+                            disabled={aiLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50 transition-all"
+                          >
+                            {aiLoading 
+                              ? <Loader2 className="w-3 h-3 animate-spin" /> 
+                              : <Sparkles className="w-3 h-3" />
+                            }
+                            {aiLoading ? "Analyzing..." : "AI Analyze"}
+                          </button>
+                        </div>
                         <textarea 
                           value={bugReport}
                           onChange={(e) => setBugReport(e.target.value)}
-                          placeholder="Describe any issues found in the agent's response..."
+                          placeholder="Describe any issues found in the agent's response, or click AI Analyze to generate automatically..."
                           className="w-full bg-transparent border-none focus:ring-0 text-sm font-sans min-h-[100px] placeholder:opacity-30"
                         />
                         <button 

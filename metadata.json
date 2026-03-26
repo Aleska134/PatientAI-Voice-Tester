@@ -1,5 +1,5 @@
 {
   "name": "PatientAI Voice Tester",
-  "description": "A professional dashboard to run automated voice stress tests on AI medical assistants using Gemini Live and Twilio.",
+  "description": "A professional dashboard to run automated voice stress tests on AI medical assistants using Open AI and Twilio.",
   "requestFramePermissions": ["microphone"]
 }
