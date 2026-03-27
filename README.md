@@ -88,6 +88,18 @@ Project Structure
 ├── .env.example       # Environment variable template
 └── vite.config.ts     # Vite configuration
 
+Technical Challenges & Observations
+	∙ Audio Overlapping (Full-Duplex Race Conditions): During testing, I identified occasional overlapping where the AI patient and the medical agent speak simultaneously. This is a common challenge in voice-to-voice LLM interactions caused by the interaction between Twilio's speechTimeout and the agent's processing latency.
+	∙ Context Coherence: Despite the overlaps, the conversation remains "coherent and lucid". The patient successfully stays in character and follows the clinical scenario (scheduling, refill, etc) by leveraging the conversation history stored in SQLite.
+	∙ Latency Management: Using GPT-4o-mini was a strategic choice to minimize response time, ensuring the simulated patient reacts quickly enough to maintain a natural flow.
+
+Future Improvements:
+	∙ Audio-Based Quality Analysis: Transition from transcript-only bug detection to direct audio analysis. While transcripts capture the "what", audio analysis is essential to identify issues like awkward latencies, robotic prosody, or the "overlapping" mentioned in the known issues.
+	∙ Speech-to-Emotions Mapping: Implementing tools to detect if the patient's tone (in audio) matches the clinical scenario's emotional state.
+
+
+
+
 Built With
 	∙	OpenAI API
 	∙	Twilio Voice
