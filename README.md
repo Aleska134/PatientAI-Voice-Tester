@@ -97,8 +97,7 @@ Future Improvements:
 	∙ Audio-Based Quality Analysis: Transition from transcript-only bug detection to direct audio analysis. While transcripts capture the "what", audio analysis is essential to identify issues like awkward latencies, robotic prosody, or the "overlapping" mentioned in the known issues.
 	∙ Speech-to-Emotions Mapping: Implementing tools to detect if the patient's tone (in audio) matches the clinical scenario's emotional state.
 
-
-
+![PatientAI Dashboard](./AI Voice Tester.png)
 
 Built With
 	∙	OpenAI API
