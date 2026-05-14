@@ -269,7 +269,10 @@ async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        allowedHosts: ['swampiest-procentralization-demetrius.ngrok-free.dev']
+      },
       appType: "spa",
       base: "/",
     });
