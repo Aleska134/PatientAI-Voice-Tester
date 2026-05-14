@@ -56,7 +56,7 @@ async function startServer() {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const from = process.env.TWILIO_PHONE_NUMBER;
-    const to = process.env.TARGET_PHONE_NUMBER || "+18054398008";
+    const to = process.env.TARGET_PHONE_NUMBER || "+17864195286";
 
     if (!accountSid || !authToken || !from) {
       return res.status(500).json({ error: "Twilio credentials missing" });
@@ -269,7 +269,10 @@ async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        allowedHosts: ['swampiest-procentralization-demetrius.ngrok-free.dev']
+      },
       appType: "spa",
       base: "/",
     });
