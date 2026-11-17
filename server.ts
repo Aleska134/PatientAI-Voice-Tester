@@ -61,6 +61,9 @@ async function startServer() {
     if (!accountSid || !authToken || !from) {
       return res.status(500).json({ error: "Twilio credentials missing" });
     }
+    if (!to) {
+      return res.status(500).json({ error: "TARGET_PHONE_NUMBER missing" });
+    }
 
     const client = twilio(accountSid, authToken);
     const callId = uuidv4();
@@ -268,10 +271,12 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    // Let Vite accept requests that arrive through the public tunnel in APP_URL.
+    const publicHost = process.env.APP_URL ? new URL(process.env.APP_URL).hostname : null;
     const vite = await createViteServer({
-      server: { 
+      server: {
         middlewareMode: true,
-        allowedHosts: ['swampiest-procentralization-demetrius.ngrok-free.dev']
+        allowedHosts: publicHost ? [publicHost] : [],
       },
       appType: "spa",
       base: "/",

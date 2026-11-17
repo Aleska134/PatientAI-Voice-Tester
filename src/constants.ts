@@ -26,7 +26,7 @@ export const SCENARIOS: Scenario[] = [
     id: 'prescription-renewal',
     name: 'Prescription Renewal',
     description: 'Urgent request for a maintenance medication refill.',
-    systemInstruction: `You are Carlos. You are calling because your blood pressure medication (Metformin) is down to the last two pills.
+    systemInstruction: `You are Carlos. You are calling because your blood pressure medication (Lisinopril) is down to the last two pills.
     You sound slightly anxious. Ask if they can send a 90-day supply to the "Walgreens on 8th St".
     If the assistant says a follow-up appointment is needed first, try to negotiate a one-month bridge refill.
     Keep the conversation under 2 minutes.`,

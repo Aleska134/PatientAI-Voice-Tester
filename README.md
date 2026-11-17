@@ -1,6 +1,6 @@
 # PatientAI Voice Tester
 
-An automated voice testing suite that stress-tests AI medical assistants over real phone calls. The system simulates realistic patient behaviors using **OpenAI GPT-4.1 Mini** and places actual calls through **Twilio**, allowing testers to evaluate how an AI medical assistant handles different clinical scenarios.
+An automated voice testing suite that stress-tests AI medical assistants over real phone calls. The system simulates realistic patient behaviors using **OpenAI GPT-4o** and places actual calls through **Twilio**, allowing testers to evaluate how an AI medical assistant handles different clinical scenarios.
 
 ---
 
@@ -10,7 +10,7 @@ An automated voice testing suite that stress-tests AI medical assistants over re
 |---|---|
 | Frontend | React + Tailwind CSS + Framer Motion |
 | Backend | Node.js + Express + TypeScript |
-| AI Engine | OpenAI API (`gpt-4.1-mini`) |
+| AI Engine | OpenAI API (`gpt-4o`) |
 | Telephony | Twilio Voice + Media Streams |
 | Database | SQLite (`better-sqlite3`) |
 | Dev Server | Vite |
@@ -22,7 +22,7 @@ An automated voice testing suite that stress-tests AI medical assistants over re
 1. The tester selects a patient scenario from the dashboard (e.g., scheduling, symptom reporting).
 2. The backend triggers an outbound call via the Twilio API to the target phone number.
 3. Twilio connects the call and hits a TwiML webhook on the Express server.
-4. The server sends the conversation history to **OpenAI GPT-4.1 Mini**, which generates the next patient response based on the scenario's system instruction.
+4. The server sends the conversation history to **OpenAI GPT-4o**, which generates the next patient response based on the scenario's system instruction.
 5. The AI's text response is spoken aloud via **Amazon Polly (Matthew Neural)** through Twilio's `<Say>` verb.
 6. The agent's speech is transcribed by Twilio and sent back to the server via `<Gather>`, continuing the conversation loop.
 7. The full transcript and call recording are stored in SQLite for review.
@@ -31,7 +31,7 @@ An automated voice testing suite that stress-tests AI medical assistants over re
 
 ## Key Design Choices
 
-**OpenAI GPT-4.1 Mini:** Chosen for its strong instruction-following at low latency, allowing the simulated patient to stay in character across multi-turn conversations without drift.
+**OpenAI GPT-4o:** Chosen for its strong instruction-following at low latency, allowing the simulated patient to stay in character across multi-turn conversations without drift.
 
 **Twilio Voice + TwiML Webhooks:** Each conversation turn is handled via stateless HTTP webhooks, making the system reliable and easy to debug. Twilio handles all telephony complexity (audio encoding, carrier routing, recording).
 
@@ -91,7 +91,7 @@ Project Structure
 Technical Challenges & Observations
 	∙ Audio Overlapping (Full-Duplex Race Conditions): During testing, I identified occasional overlapping where the AI patient and the medical agent speak simultaneously. This is a common challenge in voice-to-voice LLM interactions caused by the interaction between Twilio's speechTimeout and the agent's processing latency.
 	∙ Context Coherence: Despite the overlaps, the conversation remains "coherent and lucid". The patient successfully stays in character and follows the clinical scenario (scheduling, refill, etc) by leveraging the conversation history stored in SQLite.
-	∙ Latency Management: Using GPT-4o-mini was a strategic choice to minimize response time, ensuring the simulated patient reacts quickly enough to maintain a natural flow.
+	∙ Latency Management: Using GPT-4o was a strategic choice to minimize response time, ensuring the simulated patient reacts quickly enough to maintain a natural flow.
 
 Future Improvements:
 	∙ Audio-Based Quality Analysis: Transition from transcript-only bug detection to direct audio analysis. While transcripts capture the "what", audio analysis is essential to identify issues like awkward latencies, robotic prosody, or the "overlapping" mentioned in the known issues.
